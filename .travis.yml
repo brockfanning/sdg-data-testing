@@ -26,13 +26,14 @@ script:
   - python ./scripts/check_data.py
   - python ./scripts/build_data.py
 deploy:
-- provider: script
-  script: scripts/deploy/deploy_staging.sh
-  skip_cleanup: true
-  on:
-    branch: develop
-- provider: script
-  script: scripts/deploy/deploy.sh
-  skip_cleanup: true
-  on:
-    branch: master
+  - provider: pages
+    skip-cleanup: true
+    github-token: $GITHUB_TOKEN
+    keep-history: true
+    on:
+      branch: develop
+  - provider: script
+    script: scripts/deploy/deploy.sh
+    skip_cleanup: true
+    on:
+      branch: master
