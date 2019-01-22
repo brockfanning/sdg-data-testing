@@ -6,31 +6,12 @@ This script imports existing data for Armenia from an Excel file.
 import glob
 import os.path
 import pandas as pd
-import yaml
+import numpy as np
 
 # For more readable code below.
-HEADER_ALL = 'all'
-HEADER_YEAR_WIDE = 'year'
 HEADER_YEAR_TIDY = 'Year'
 HEADER_VALUE_TIDY = 'Value'
 FOLDER_DATA_CSV_TIDY = 'data'
-FOLDER_DATA_CSV_WIDE = 'data-wide'
-FOLDER_META = 'meta'
-FOLDER_DATA_CSV_SUBNATIONAL = 'data-wide/subnational'
-
-# Specific info on how to parse the indicators in this file.
-INDICATORS = {
-  '1.1.1': {
-    'start': 3,
-    'end': 21,
-    'disaggregations': {
-      'Sex': [4, 5],
-      'Location': [6, 7],
-      'Age': [8, 9],
-      'Employment status': [11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21],
-    }
-  }
-}
 
 """
 Normatization notes:
@@ -41,7 +22,6 @@ Normatization notes:
    During this process, save the starting rows for each indicator in a separate
    dict.
 5. Remove "age" and "aged" from all values of "Category"
-6. Remove any rows with a Category of "Children" (count these, may just be 1)
 7. Trip whitepace from all values of Category
 8. Remove all rows without any value in Category
 10. Normalize with case-insensitive wild-card replacements:
@@ -66,11 +46,6 @@ At this point print output for tweaks.
 """
 
 YEARS = ['2015', '2016', '2017']
-
-# Allows for more human-friendly folder names in the repository.
-FOLDER_NAME_CONVERSIONS = {
-    'state': 'GeoCode',
-}
 
 def tidy_blank_dataframe():
     """This starts a blank dataframe with our required tidy columns."""
@@ -100,6 +75,17 @@ def tidy_csv(csv):
 
     return True
 
+def indicator_id(text):
+    ret = False
+    if isinstance(text, str):
+        words = text.split(' ')
+        id = words[0]
+        if '.' in id:
+            if id.endswith('.'):
+                id = id[:-1]
+            ret = id
+    return ret
+
 def main():
     """Tidy up all of the indicator CSVs in the data folder."""
 
@@ -111,14 +97,37 @@ def main():
     # Read the Excel spreadsheet into a dataframe.
     excel_opts = {
       'header': None,
-      'names': ['Global', 'National'],
-      'skiprows': range(start),
-      'nrows': end - start,
-      'usecols': [2,3]
+      'names': ['Global', 'National', 'Unit', '2015', '2016', '2017'],
+      'skiprows': [0, 1],
+      'usecols': [2,3,4,5,6,7]
     }
     df = pd.read_excel('SDG_eng.xlsx', **excel_opts)
 
-    #df['indicator_description'] = df.bfill(axis=1).iloc[:, 0]
+    # Ignore rows with no yearly data.
+    years = ['2015', '2016', '2017']
+    df = df.dropna(subset=years, how='all')
+
+    # Merge 'Global' and 'National' to a 'Category' column.
+    df['Category'] = np.where(df.National.isnull(), df.Global, df.National)
+    df = df.drop(labels=['Global', 'National'], axis='columns')
+
+    # Figure out where each indicator starts and set the ID.
+    starting_rows = {}
+    for row in df.iterrows():
+        category = row[1]['Category']
+        id = indicator_id(category)
+        if id:
+            starting_rows[id] = row[0]
+            df.set_value(row[0], 'Category', id)
+
+    # Remove "age" and "aged".
+    df = df.replace('aged', '', regex=True)
+    df = df.replace('age', '', regex=True)
+
+    # Remove whitespace from Category values.
+    df['Category'] = df['Category'].str.strip()
+
+    print(df['Category'])
 
     return status
 
