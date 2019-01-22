@@ -13,49 +13,41 @@ HEADER_YEAR = 'Year'
 HEADER_VALUE = 'Value'
 FOLDER_DATA_CSV = 'data'
 
-"""
-Normatization notes:
-1. Remove all rows without data in any year.
-3. Merge "Global" and "National" into one "Category" column and remove them.
-4. Look for any row with an indicator id in it, and remove everything except
-   for the indicator ID. Note this may need specific exceptions, so check it.
-   During this process, save the starting rows for each indicator in a separate
-   dict.
-5. Remove "age" and "aged" from all values of "Category"
-7. Trip whitepace from all values of Category
-8. Remove all rows without any value in Category
-10. Normalize with case-insensitive wild-card replacements:
-    (skipping any that already have a comma)
-    *boy* -> Male
-    *girl* -> Female
-    *urban* -> Urban
-    *rural* -> Rural
-11. Loop through the indicators and loop through the rows.
-    (skipping any that already have a comma)
-    a. Any "Male" or "Female" after the first occurence, assume it is a double
-       category. Combine it with the last non-gender-related category, separated
-       by a comma.
-12. Loop through the indicators, finally created tidy CSV data.
-    a. First row is always the total
-    b. Other rows infer the disaggregation type from the Category, using hints:
-        Male/Female = Sex
-        *Year*/*Month* = Age
-        Anything iwth two integers and a hyphen = Age
-
-At this point print output for tweaks.
-"""
-
 YEARS = ['2015', '2016', '2017']
 
+HARDCODED_DISAGGREGATION_COLUMNS = {
+    'participants': 'Employment status',
+    'economically inactive  population': 'Employment status',
+    'pensioners': 'Employment status',
+    'students': 'Employment status',
+    'other inactive population': 'Employment status',
+}
+
+GENERAL_REPLACEMENTS = {
+    '10.7.2. a': '10.7.2.a',
+    '10.7.2. b': '10.7.2.b',
+    '5.a.1 (a).a': '5.a.1.a.a',
+    '5.a.1 (b).a.1': '5.a.1.b.a.1',
+    '5.a.1 (b).a.2': '5.a.1.b.a.2',
+}
+
 def get_disaggregation_column(category):
-    ret = 'Unknown'
-    if category == 'Male' or category == 'Female':
+    category = category.lower()
+    ret = False
+    if category == 'male' or category == 'female':
         ret = 'Sex'
-    if category == 'Rural' or category == 'Urban':
+    if category == 'rural' or category == 'urban':
         ret = 'Location'
     if '-' in category or ' to ' in category:
         ret = 'Age'
-    print category + ' ' + ret
+    if 'employ' in category:
+        ret = 'Employment status'
+    if not ret:
+        # Consult a hardcoded list.
+        if category in HARDCODED_DISAGGREGATION_COLUMNS:
+            ret = HARDCODED_DISAGGREGATION_COLUMNS[category]
+
+    return ret
 
 def blank_dataframe():
     """This starts a blank dataframe with our required tidy columns."""
@@ -120,6 +112,10 @@ def main():
         '8.6.1'
     ]
 
+    # Do some general replacements.
+    for search in GENERAL_REPLACEMENTS:
+        df = df.replace(search, GENERAL_REPLACEMENTS[search], regex=True)
+
     # Merge 'Global' and 'National' to a 'Category' column.
     df['Category'] = np.where(df.National.isnull(), df.Global, df.National)
     df = df.drop(labels=['Global', 'National'], axis='columns')
@@ -129,14 +125,17 @@ def main():
 
     # NOTE: The total number of rows should not change after this point. We
     # reset the index now for logical sequential indexes.
-    df = df.reset_index()
-    df = df.drop(labels=['index'], axis='columns')
+    df = df.reset_index(drop=True)
 
     # Figure out where each indicator starts and set the ID.
     indicators = {}
     for row in df.iterrows():
         category = row[1]['Category']
         id = indicator_id(category)
+        if id == '17.8.1':
+            print(category)
+            print(id)
+            print(row[0])
         if id:
             indicators[id] = {
                 'start': row[0]
@@ -156,6 +155,7 @@ def main():
         # For ease later, add the number of rows.
         indicators[id]['num_rows'] = indicators[id]['end'] - indicators[id]['start'] + 1
 
+    #print(indicators)
     # Remove "age" and "aged".
     df = df.replace('aged', '', regex=True)
     df = df.replace('age', '', regex=True)
@@ -241,10 +241,19 @@ def main():
 
         # Take a slice of the main dataframe for this indicator.
         indicator_df = df[start:end + 1]
-        print(indicator_df)
-        break
+        #print(indicator_df)
+        for row in indicator_df.iterrows():
+            category = row[1]['Category']
+            if id == category:
+                # This is the aggregate total. If this has no values, then we
+                # have to skip the whole indicator. Make a note of this.
+                foo = 'bar'
+                continue
+            disaggregation_column = get_disaggregation_column(category)
+            #if not disaggregation_column:
+            #    print(id + ' -- ' + category)
 
-        csv_df = tidy_blank_dataframe()
+        csv_df = blank_dataframe()
 
 
 
