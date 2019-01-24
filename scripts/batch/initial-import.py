@@ -118,6 +118,11 @@ def write_csv(id, df):
 
     csv_filename = 'indicator_' + id.replace('.', '-') + '.csv'
 
+    # Drop the Units column if there is only one type of unit.
+    different_units = df['Units'].unique()
+    if len(different_units) < 2:
+        df = df.drop(labels=['Units'], axis='columns')
+
     try:
         path = os.path.join(FOLDER_DATA_CSV, csv_filename)
         df.to_csv(path, index=False, encoding='utf-8')
