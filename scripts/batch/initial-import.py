@@ -351,8 +351,9 @@ def parse_excel_sheet(sheet):
                 name_translation_key = get_translation_key(current_id)
                 name_translation = 'meta.' + name_translation_key
                 name = get_indicator_name(row, national_or_global, current_id)
-                # Output some text to copy into a translation file.
-                print(name_translation_key + ': ' + name)
+                # Output some text to copy into a translation file. This has
+                # been done once, so no need to output this anymore.
+                #print(name_translation_key + ': ' + name)
                 tags = []
                 # Give it a tag if the customisation value is more than 1.
                 if isinstance(row['customisation'], int) and row['customisation'] > 1:
@@ -417,6 +418,10 @@ def parse_excel_sheet(sheet):
             # If there is no yearly data, we won't know how to understand
             # what this row is.
             if not has_yearly_data(row):
+                # We have to assume that this means that any current
+                # disaggregations have ended, so reset the disagg stuff.
+                current_disaggregations = []
+                found_all_disaggregations = False
                 continue
 
             # Now we are looking at a row with values. This means that all
@@ -442,6 +447,8 @@ def is_valid_disaggregation(disagg):
     if disagg is None or not disagg:
         return False
     if disagg not in disagg_table:
+        # Output this for a report of database/disaggregation mismatch.
+        print(disagg)
         return False
     return True
 
@@ -483,7 +490,7 @@ def output_meta(indicator_id):
     with open(filepath, 'w') as outfile:
         outfile.write(yaml_string.replace("\n...\n", "\n---\n"))
 
-    write_indicator_for_site_repo(metadata)
+    #write_indicator_for_site_repo(metadata)
 
 # Output data.
 def output_data(indicator_id):
@@ -550,5 +557,4 @@ if __name__ == '__main__':
     if not main():
         raise RuntimeError("Failed tidy conversion")
     else:
-        #print(indicators)
         print("Success")
