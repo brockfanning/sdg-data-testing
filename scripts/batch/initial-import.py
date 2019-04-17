@@ -14,6 +14,7 @@ import yaml
 indicator_map = {}
 disagg_table = {}
 meta_translations = {}
+disagg_mismatches = {}
 
 # For more readable code below.
 HEADER_YEAR = 'Year'
@@ -444,11 +445,15 @@ def parse_excel_sheet(sheet):
 
 # Check a string is a valid disaggregation.
 def is_valid_disaggregation(disagg):
+    global disagg_mismatches
     if disagg is None or not disagg:
         return False
     if disagg not in disagg_table:
-        # Output this for a report of database/disaggregation mismatch.
-        print(disagg)
+        # Save this for a report of database/disaggregation mismatch.
+        disagg_string = disagg
+        if not isinstance(disagg_string, str):
+            disagg_string = str(disagg_string)
+        disagg_mismatches[disagg_string] = True
         return False
     return True
 
@@ -550,6 +555,10 @@ def main():
     # Now we have rough data, and need to clean/fix it.
     for indicator_id in indicator_map:
         process_indicator(indicator_id)
+
+    # Output the mismatches.
+    for mismatch in sorted(disagg_mismatches.keys()):
+        print("'" + mismatch + "'")
 
     return status
 
