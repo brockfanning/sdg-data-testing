@@ -1,26 +1,6 @@
-# -*- coding: utf-8 -*-
-"""
-Created on 2017-10-04
+import os
+from sdg.open_sdg import open_sdg_check
 
-@author: dougashton
-"""
-
-# %% setup
-
-import sdg
-
-def main():
-    """Run csv checks on all indicator csvs in the data directory"""
-    status = True
-    
-    status = status & sdg.check_all_csv()
-    status = status & sdg.check_all_meta()
-
-    return status
-
-if __name__ == '__main__':
-    status = main()
-    if(not status):
-        raise RuntimeError("Failed checks")
-    else:
-        print("Success")
+validation_successful = open_sdg_check(config='data_config.yml')
+if not validation_successful:
+    raise Exception('There were validation errors. See output above.')
